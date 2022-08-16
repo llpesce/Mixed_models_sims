@@ -180,14 +180,15 @@ limma_fit <- function(model_matrix,y,coeff,block=NULL, correlation=NULL,n_diff=2
 #' @param y      matrix with the gene expression for the analysis
 #' @param coeff  character with the coef. to be selected for plot and top table
 #' @param n_diff number of actually differentially expressed genes
-dream_fit <- function(form,design,y,coeff,n_diff){
-  fitmm = dream( y, form, design)
+dream_fit <- function(form,design,y,coeff,n_diff,BPPARAM){
+  fitmm = dream( y, form, design, BPPARAM = BPPARAM)
   fitmm = eBayes(fitmm)
   # Map true positives vs false positives 
   table(
     rownames(topTable( fitmm, coef=coeff,p.value = .05, n=Inf)) %>%
       stringr::str_remove(., pattern="Gene_")  <= n_diff )
 }
+
 
 # Generate dataset
 n_genes <- 1000
@@ -203,6 +204,7 @@ sims <- data.frame(model=character(),
                           TP=integer(),
                           FP=integer(),
                           stringsAsFactors=FALSE)
+
 for(i in 1:n_sim){
   print(i)
   dataset <- make_t1_t2_set(n_genes,n_subj,n_diff, corr_t2_t1, delta_scale, do_plot=F)
@@ -305,6 +307,8 @@ cbind(sims %>% filter(model=='t2_t1_block'),
 sims_blocking <- sims
 
 # DREAM ==============
+# Parallel setting
+BPPARAM <- SnowParam(8, "SOCK", progressbar = TRUE)
 
 n_sim <- 50
 #create data frame with 0 rows and 3 columns
@@ -329,10 +333,10 @@ for(i in 1:n_sim){
   sims[nrow(sims) + 1,] <- c('t2_t1_t_xc_0_subj', tmp[[2]], tmp[[1]])
 
   
-  tmp <- dream_fit(form = ~  t2_t1 + (1|subj), design, y, coeff = 't2_t1', n_diff=n_diff)
+  tmp <- dream_fit(form = ~  t2_t1 + (1|subj), design, y, coeff = 't2_t1', n_diff=n_diff,BPPARAM=BPPARAM)
   sims[nrow(sims) + 1,] <- c('Dream_t2_t1', tmp[[2]], tmp[[1]])
   
-  tmp <- dream_fit(form = ~  t2_t1 + t_xc_0 + (1|subj), design, y, coeff = 't2_t1', n_diff=n_diff)
+  tmp <- dream_fit(form = ~  t2_t1 + t_xc_0 + (1|subj), design, y, coeff = 't2_t1', n_diff=n_diff,BPPARAM=BPPARAM)
   sims[nrow(sims) + 1,] <- c('Dream_t2_t1_t_xc_0', tmp[[2]], tmp[[1]])
     
 }
